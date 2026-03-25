@@ -131,12 +131,12 @@ class TestResearch:
         assert "https://example.com/report" in result
         assert "Example Security Report" in result
 
-    def test_research_resolves_vertexai_redirect_urls(self, mock_genai_client, monkeypatch):
-        """Vertex AI リダイレクト URL を実 URL に解決してグラウンディングソースに追記する。"""
+    def test_research_resolves_vertexai_redirect_urls_and_fetches_title(self, mock_genai_client, monkeypatch):
+        """Vertex AI リダイレクト URL を実 URL に解決し、ページタイトルも取得する。"""
         _, mock_instance = mock_genai_client
         redirect_chunk = MagicMock()
         redirect_chunk.web.uri = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc123"
-        redirect_chunk.web.title = "Security Article"
+        redirect_chunk.web.title = "some-hostname.com"  # metadata はホスト名のみ
         candidate = MagicMock()
         candidate.grounding_metadata.grounding_chunks = [redirect_chunk]
         mock_response = MagicMock()
@@ -145,8 +145,8 @@ class TestResearch:
         mock_instance.models.generate_content.return_value = mock_response
 
         monkeypatch.setattr(
-            "ioc_collector.gemini_client._resolve_url",
-            lambda url: "https://actual-source.com/article",
+            "ioc_collector.gemini_client._resolve_redirect",
+            lambda url: ("https://actual-source.com/article", "Actual Page Title"),
         )
 
         client = GeminiResearchClient(project="my-project", location="us-central1")
@@ -154,6 +154,7 @@ class TestResearch:
 
         assert "vertexaisearch.cloud.google.com" not in result
         assert "https://actual-source.com/article" in result
+        assert "Actual Page Title" in result
 
     def test_research_falls_back_to_redirect_url_on_resolution_error(self, mock_genai_client, monkeypatch):
         """URL 解決が失敗した場合はリダイレクト URL をそのまま使用する（消えるよりマシ）。"""
@@ -169,10 +170,10 @@ class TestResearch:
         mock_response.candidates = [candidate]
         mock_instance.models.generate_content.return_value = mock_response
 
-        # 解決失敗 → 元の URL を返す
+        # 解決失敗 → 元の URL とタイトルなしを返す
         monkeypatch.setattr(
-            "ioc_collector.gemini_client._resolve_url",
-            lambda url: url,
+            "ioc_collector.gemini_client._resolve_redirect",
+            lambda url: (url, ""),
         )
 
         client = GeminiResearchClient(project="my-project", location="us-central1")

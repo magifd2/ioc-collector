@@ -1,7 +1,9 @@
 """Vertex AI Gemini クライアント。ADC 認証を使用して Web リサーチを実行する。"""
 
+import html
 import logging
 import os
+import re
 import time
 import urllib.request
 
@@ -52,15 +54,23 @@ _VERTEXAI_REDIRECT_HOST = "vertexaisearch.cloud.google.com"
 _RESOLVE_TIMEOUT = 5  # 秒
 
 
-def _resolve_url(url: str) -> str:
-    """リダイレクト URL を追跡して最終的な URL を返す。失敗時は元の URL を返す。"""
+def _resolve_redirect(url: str) -> tuple[str, str]:
+    """Vertex AI リダイレクト URL を解決し (最終URL, ページタイトル) を返す。
+
+    ページの先頭 4KB を読んで <title> タグを取得する。
+    失敗時は (元URL, "") を返す。
+    """
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "ioc-collector"})
         with urllib.request.urlopen(req, timeout=_RESOLVE_TIMEOUT) as response:
-            return response.url
+            final_url = response.url
+            raw = response.read(4096).decode("utf-8", errors="ignore")
+            match = re.search(r"<title[^>]*>([^<]+)</title>", raw, re.IGNORECASE)
+            page_title = html.unescape(match.group(1).strip()) if match else ""
+            return final_url, page_title
     except Exception:
-        logger.debug("Could not resolve URL %s; using as-is.", url)
-        return url
+        logger.debug("Could not resolve redirect URL %s; using as-is.", url)
+        return url, ""
 
 
 def _extract_grounding_sources(response) -> list[tuple[str, str]]:
@@ -84,7 +94,10 @@ def _extract_grounding_sources(response) -> list[tuple[str, str]]:
                 title = getattr(web, "title", "") or uri
                 if uri:
                     if _VERTEXAI_REDIRECT_HOST in uri:
-                        uri = _resolve_url(uri)
+                        resolved_uri, page_title = _resolve_redirect(uri)
+                        uri = resolved_uri
+                        if page_title:
+                            title = page_title
                     sources.append((title, uri))
     except Exception:
         pass

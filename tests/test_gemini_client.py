@@ -131,27 +131,54 @@ class TestResearch:
         assert "https://example.com/report" in result
         assert "Example Security Report" in result
 
-    def test_research_filters_vertexai_redirect_urls(self, mock_genai_client):
-        """Vertex AI リダイレクト URL はグラウンディングソースから除外する。"""
+    def test_research_resolves_vertexai_redirect_urls(self, mock_genai_client, monkeypatch):
+        """Vertex AI リダイレクト URL を実 URL に解決してグラウンディングソースに追記する。"""
         _, mock_instance = mock_genai_client
         redirect_chunk = MagicMock()
         redirect_chunk.web.uri = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc123"
-        redirect_chunk.web.title = "Redirected"
-        real_chunk = MagicMock()
-        real_chunk.web.uri = "https://real-source.com/article"
-        real_chunk.web.title = "Real Source"
+        redirect_chunk.web.title = "Security Article"
         candidate = MagicMock()
-        candidate.grounding_metadata.grounding_chunks = [redirect_chunk, real_chunk]
+        candidate.grounding_metadata.grounding_chunks = [redirect_chunk]
         mock_response = MagicMock()
         mock_response.text = "Research text"
         mock_response.candidates = [candidate]
         mock_instance.models.generate_content.return_value = mock_response
 
+        monkeypatch.setattr(
+            "ioc_collector.gemini_client._resolve_url",
+            lambda url: "https://actual-source.com/article",
+        )
+
         client = GeminiResearchClient(project="my-project", location="us-central1")
         result = client.research("test query")
 
         assert "vertexaisearch.cloud.google.com" not in result
-        assert "https://real-source.com/article" in result
+        assert "https://actual-source.com/article" in result
+
+    def test_research_falls_back_to_redirect_url_on_resolution_error(self, mock_genai_client, monkeypatch):
+        """URL 解決が失敗した場合はリダイレクト URL をそのまま使用する（消えるよりマシ）。"""
+        _, mock_instance = mock_genai_client
+        redirect_url = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc123"
+        chunk = MagicMock()
+        chunk.web.uri = redirect_url
+        chunk.web.title = "Article"
+        candidate = MagicMock()
+        candidate.grounding_metadata.grounding_chunks = [chunk]
+        mock_response = MagicMock()
+        mock_response.text = "Research text"
+        mock_response.candidates = [candidate]
+        mock_instance.models.generate_content.return_value = mock_response
+
+        # 解決失敗 → 元の URL を返す
+        monkeypatch.setattr(
+            "ioc_collector.gemini_client._resolve_url",
+            lambda url: url,
+        )
+
+        client = GeminiResearchClient(project="my-project", location="us-central1")
+        result = client.research("test query")
+
+        assert redirect_url in result
 
     def test_research_no_grounding_metadata_returns_text_only(self, mock_genai_client):
         """グラウンディングメタデータがない場合はテキストのみ返す。"""

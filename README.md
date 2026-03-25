@@ -88,6 +88,18 @@ uv run ioc-collector --target "..." --model gemini-2.5-pro
 
 デフォルトモデルは `gemini-2.5-flash` です。
 
+### 出力言語を指定する
+
+```bash
+# 英語で出力
+uv run ioc-collector --target "CVE-2024-1234" --language en
+
+# 日本語で出力（デフォルト）
+uv run ioc-collector --target "CVE-2024-1234" --language ja
+```
+
+BCP 47 言語コードを指定できます。`ja`/`en` はレポートのセクション見出しも対応言語になります。その他のコードは英語フォールバックです。
+
 ### デバッグログを有効化する
 
 ```bash
@@ -103,6 +115,7 @@ uv run ioc-collector --target "..." --verbose
 | `--non-interactive` | — | `false` | 確認プロンプトをスキップ |
 | `--output DIR` | `-o` | `.`（カレント）| 出力ディレクトリ |
 | `--model TEXT` | — | `gemini-2.5-flash` | 使用する Gemini モデル |
+| `--language TEXT` | `-l` | `ja` | 出力言語（BCP 47 コード: `ja`, `en` 等）|
 | `--verbose` | `-v` | `false` | デバッグログを出力 |
 
 ## エラーへの対処

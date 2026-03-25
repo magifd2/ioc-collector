@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.2] - 2026-03-25
+
+### Fixed
+
+- Reference URLs were disappearing entirely when all grounding sources were Vertex AI redirect URLs
+  - Redirect URLs (`vertexaisearch.cloud.google.com`) are now resolved to the actual page URL via HTTP
+  - On resolution failure (timeout, network error), the redirect URL is kept as-is — a functional link is better than no link at all
+
+---
+
 ## [0.1.1] - 2026-03-25
 
 ### Added
@@ -56,5 +66,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - STIX JSON output uses `ensure_ascii=False` for human-readable non-ASCII characters
 - `OTHER` type IoCs use `pattern_type="sigma"` as a STIX validator workaround
 
+[0.1.2]: https://github.com/magifd2/ioc-collector/releases/tag/v0.1.2
 [0.1.1]: https://github.com/magifd2/ioc-collector/releases/tag/v0.1.1
 [0.1.0]: https://github.com/magifd2/ioc-collector/releases/tag/v0.1.0

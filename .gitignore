@@ -17,6 +17,7 @@ external/
 !DOCUMENT.md
 !GEMINI.md
 !ARCHITECTURE.md
+!CHANGELOG.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -13,6 +13,7 @@ external/
 *.md
 *.json
 !README.md
+!README.ja.md
 !AGENTS.md
 !DOCUMENT.md
 !GEMINI.md

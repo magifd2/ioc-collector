@@ -1,157 +1,119 @@
 # ioc-collector
 
-セキュリティインシデントのレポートや記事 URL を入力として、Web を自律的に調査し、IoC（Indicators of Compromise）情報を抽出・構造化する CLI ツールです。
+A CLI tool that autonomously researches security incidents from report URLs, CVE IDs, or natural language queries, and extracts structured IoC (Indicators of Compromise) data into Markdown reports and STIX 2.1 bundles.
 
-## 出力物
+[日本語版 README はこちら](README.ja.md)
 
-実行すると2つのファイルが生成されます。
+## Features
 
-| ファイル | 内容 |
-|---|---|
-| `{インシデント名}_{日時}.md` | インシデント概要・タイムライン・影響範囲・対策・IoC一覧（デファング済み）・参考URL |
-| `{インシデント名}_{日時}.json` | STIX 2.1 Bundle（`Indicator`・`Report` オブジェクト） |
+- **Autonomous web research** — Given a URL, CVE ID, or free-text query, investigates the incident by browsing the web
+- **Dual output** — Produces a human-readable Markdown report and a machine-readable STIX 2.1 JSON bundle
+- **Defanged IoCs** — All indicators are defanged in the Markdown output for safe sharing
+- **Multi-language output** — Reports can be generated in Japanese or English (BCP 47 codes supported)
+- **Flexible input** — Accepts URL arguments, file input (`--file`), or stdin for pipeline use
+- **Configurable model** — Choose any Gemini model; defaults to `gemini-2.5-flash`
 
-## セットアップ
+## Installation
 
-### 前提条件
-
-- Python 3.13+
-- [uv](https://docs.astral.sh/uv/)
-- Google Cloud プロジェクト（Vertex AI API が有効化済み）
-
-### インストール
+**Prerequisites:** Python 3.13+ and [uv](https://docs.astral.sh/uv/). A Google Cloud project with the Vertex AI API enabled is also required.
 
 ```bash
-git clone <repository-url>
-cd ioc_collector
+git clone https://github.com/nlink-jp/ioc-collector.git
+cd ioc-collector
 uv sync --extra dev
 ```
 
-### Google Cloud 認証
+## Configuration
 
-ADC（Application Default Credentials）を使用します。
+`ioc-collector` uses Application Default Credentials (ADC) for Google Cloud authentication.
 
 ```bash
 gcloud auth application-default login
 ```
 
-必要な環境変数を設定します。
+Set the required environment variables:
 
 ```bash
 export GOOGLE_CLOUD_PROJECT="your-project-id"
-export GOOGLE_CLOUD_LOCATION="us-central1"   # 省略時のデフォルト
+export GOOGLE_CLOUD_LOCATION="us-central1"   # optional, defaults to us-central1
 ```
 
-## 使い方
-
-### URL を調査する
+## Usage
 
 ```bash
+# Research from a URL
 uv run ioc-collector --target "https://example.com/security-incident-report"
-```
 
-### CVE-ID や自然言語テキストで調査する
+# Research by CVE ID or natural language
+uv run ioc-collector --target "CVE-2024-1234 ransomware campaign"
 
-```bash
-uv run ioc-collector --target "CVE-2024-1234 に関連するランサムウェアキャンペーン"
-```
-
-### ファイルから入力する
-
-```bash
+# Read target from a file
 uv run ioc-collector --file incident_query.txt
-```
 
-### 標準入力から渡す
-
-```bash
+# Read target from stdin
 cat incident_query.txt | uv run ioc-collector
-```
 
-### 出力ディレクトリを指定する
-
-```bash
+# Specify output directory
 uv run ioc-collector --target "..." --output ./reports
-```
 
-### 確認プロンプトをスキップする（自動化用途）
-
-```bash
+# Skip confirmation prompt (for automation)
 uv run ioc-collector --target "..." --non-interactive
-```
 
-### モデルを指定する
-
-```bash
+# Specify model
 uv run ioc-collector --target "..." --model gemini-2.5-pro
-```
 
-デフォルトモデルは `gemini-2.5-flash` です。
-
-### 出力言語を指定する
-
-```bash
-# 英語で出力
+# Output in English
 uv run ioc-collector --target "CVE-2024-1234" --language en
 
-# 日本語で出力（デフォルト）
-uv run ioc-collector --target "CVE-2024-1234" --language ja
-```
-
-BCP 47 言語コードを指定できます。`ja`/`en` はレポートのセクション見出しも対応言語になります。その他のコードは英語フォールバックです。
-
-### デバッグログを有効化する
-
-```bash
+# Enable debug logging
 uv run ioc-collector --target "..." --verbose
 ```
 
-## オプション一覧
+### Options
 
-| オプション | 短縮形 | デフォルト | 説明 |
+| Option | Short | Default | Description |
 |---|---|---|---|
-| `--target TEXT` | `-t` | — | 調査対象（URL / CVE-ID / 自然言語）|
-| `--file PATH` | `-f` | — | 入力ファイルパス |
-| `--non-interactive` | — | `false` | 確認プロンプトをスキップ |
-| `--output DIR` | `-o` | `.`（カレント）| 出力ディレクトリ |
-| `--model TEXT` | — | `gemini-2.5-flash` | 使用する Gemini モデル |
-| `--language TEXT` | `-l` | `ja` | 出力言語（BCP 47 コード: `ja`, `en` 等）|
-| `--verbose` | `-v` | `false` | デバッグログを出力 |
+| `--target TEXT` | `-t` | — | Research target (URL / CVE ID / natural language) |
+| `--file PATH` | `-f` | — | Input file path |
+| `--non-interactive` | — | `false` | Skip confirmation prompt |
+| `--output DIR` | `-o` | `.` (current dir) | Output directory |
+| `--model TEXT` | — | `gemini-2.5-flash` | Gemini model to use |
+| `--language TEXT` | `-l` | `ja` | Output language (BCP 47: `ja`, `en`, etc.) |
+| `--verbose` | `-v` | `false` | Enable debug logging |
 
-## エラーへの対処
+### Output files
 
-| エラーメッセージ | 原因 | 対処 |
+Each run produces two files:
+
+| File | Contents |
+|---|---|
+| `{incident-name}_{datetime}.md` | Incident summary, timeline, scope, mitigations, defanged IoC list, references |
+| `{incident-name}_{datetime}.json` | STIX 2.1 Bundle (`Indicator` and `Report` objects) |
+
+### Error reference
+
+| Error message | Cause | Resolution |
 |---|---|---|
-| `GOOGLE_CLOUD_PROJECT is not set` | 環境変数未設定 | `export GOOGLE_CLOUD_PROJECT=...` |
-| `Authentication failed` | ADC 未設定または権限不足 | `gcloud auth application-default login` |
-| `Rate limit exceeded after retries` | API クォータ超過 | しばらく待ってから再実行 |
-| `Could not parse structured report` | Gemini の出力が不正 | `--verbose` で詳細を確認し、再実行 |
+| `GOOGLE_CLOUD_PROJECT is not set` | Missing env var | `export GOOGLE_CLOUD_PROJECT=...` |
+| `Authentication failed` | ADC not configured or insufficient permissions | `gcloud auth application-default login` |
+| `Rate limit exceeded after retries` | API quota exceeded | Wait and retry |
+| `Could not parse structured report` | Malformed Gemini output | Run with `--verbose` and retry |
 
-## 開発者向け
-
-### テストの実行
+## Building
 
 ```bash
+# Run tests
 uv run pytest
-```
 
-### カバレッジ付きで実行
-
-```bash
+# Run tests with coverage
 uv run pytest --cov=ioc_collector --cov-report=term-missing
-```
 
-### Lint / フォーマット
-
-```bash
+# Lint / format
 uv run ruff check src/ tests/
 uv run ruff format src/ tests/
 ```
 
-## 設計・アーキテクチャ
+## Documentation
 
-技術的な設計判断とその根拠については [ARCHITECTURE.md](./ARCHITECTURE.md) を参照してください。
-
-## 開発ルール
-
-ブランチ戦略・コミット規約・セキュリティ方針については [AGENTS.md](./AGENTS.md) を参照してください。
+- [Architecture](./ARCHITECTURE.md)
+- [Development rules](./AGENTS.md)

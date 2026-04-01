@@ -106,6 +106,52 @@ class TestBuildBundle:
         assert "[domain-name:value = 'evil.example.com']" in indicators["evil[.]example[.]com"].pattern
         assert "[url:value = 'http://evil.example.com/path']" in indicators["hxxp://evil[.]example[.]com/path"].pattern
 
+    def test_single_quote_in_value_is_stripped(self):
+        """シングルクォートを含む IoC 値がエラーにならずパターン生成されること。"""
+        report = IncidentReport(
+            title="Test",
+            summary=".",
+            affected_scope=".",
+            iocs=[
+                IoCEntry(type=IoCType.FILE_NAME, value="it's_malware.exe"),
+                IoCEntry(type=IoCType.DOMAIN_NAME, value="o'reilly.evil.com"),
+            ],
+        )
+        bundle = StixBuilder(report).build()
+        indicators = {i.name: i for i in bundle.objects if i.type == "indicator"}
+        assert "[file:name = 'its_malware.exe']" in indicators["it's_malware.exe"].pattern
+        assert "[domain-name:value = 'oreilly.evil.com']" in indicators["o'reilly.evil.com"].pattern
+
+    def test_invalid_pattern_skipped_gracefully(self):
+        """STIX パターンバリデーションに失敗した IoC がスキップされること。"""
+        report = IncidentReport(
+            title="Test",
+            summary=".",
+            affected_scope=".",
+            iocs=[
+                IoCEntry(type=IoCType.IPV4_ADDR, value="192.0.2.1"),
+                IoCEntry(type=IoCType.DOMAIN_NAME, value="good.example.com"),
+            ],
+        )
+        # 2番目の IoC のビルド時のみ InvalidValueError を発生させる
+        original_build = stix2.Indicator.__init__
+        call_count = 0
+
+        def patched_init(self_ind, *args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                raise stix2.exceptions.InvalidValueError(
+                    stix2.Indicator, "pattern", "test error",
+                )
+            return original_build(self_ind, *args, **kwargs)
+
+        with patch.object(stix2.Indicator, "__init__", patched_init):
+            bundle = StixBuilder(report).build()
+        indicators = [o for o in bundle.objects if o.type == "indicator"]
+        assert len(indicators) == 1
+        assert indicators[0].name == "192.0.2.1"
+
     def test_serializes_to_valid_json(self, sample_report):
         bundle = StixBuilder(sample_report).build()
         json_str = bundle.serialize()

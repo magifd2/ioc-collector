@@ -1,5 +1,6 @@
 """STIX 2.1 Bundle のビルダー。IncidentReport を STIX 形式に変換する。"""
 
+import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,6 +9,8 @@ import stix2
 
 from ioc_collector.defang import refang
 from ioc_collector.models import IncidentReport, IoCEntry, IoCType
+
+logger = logging.getLogger(__name__)
 
 
 def _sanitize_filename(text: str) -> str:
@@ -20,7 +23,7 @@ def _ioc_to_pattern(ioc: IoCEntry) -> str:
 
     デファング表記を解除した実値を使用する。
     """
-    v = refang(ioc.value).replace("'", "\\'")
+    v = refang(ioc.value).replace("'", "")
     match ioc.type:
         case IoCType.IPV4_ADDR:
             return f"[ipv4-addr:value = '{v}']"
@@ -65,7 +68,12 @@ class StixBuilder:
 
     def build(self) -> stix2.Bundle:
         """STIX 2.1 Bundle を生成して返す。"""
-        indicators = [_build_indicator(ioc) for ioc in self._report.iocs]
+        indicators: list[stix2.Indicator] = []
+        for ioc in self._report.iocs:
+            try:
+                indicators.append(_build_indicator(ioc))
+            except stix2.exceptions.InvalidValueError:
+                logger.warning("Skipping IoC with invalid STIX pattern: %s", ioc.value)
 
         extra_objects: list = []
         if indicators:

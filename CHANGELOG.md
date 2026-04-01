@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.6] - 2026-04-01
+
+### Fixed
+
+- STIX pattern generation crashed with `InvalidValueError` when an IoC value contained a backslash (e.g., `%PROGRAMDATA%\wt.exe`)
+  - Backslashes are now escaped (`\` → `\\`) in STIX pattern string literals
+- IoC values with leading/trailing whitespace could produce invalid STIX patterns
+  - Values are now stripped before pattern generation
+- Warning log now includes IoC type and error details for easier debugging
+
+---
+
 ## [0.1.5] - 2026-04-01
 
 ### Fixed
@@ -96,6 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - STIX JSON output uses `ensure_ascii=False` for human-readable non-ASCII characters
 - `OTHER` type IoCs use `pattern_type="sigma"` as a STIX validator workaround
 
+[0.1.6]: https://github.com/nlink-jp/ioc-collector/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/nlink-jp/ioc-collector/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/nlink-jp/ioc-collector/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/nlink-jp/ioc-collector/releases/tag/v0.1.3
